@@ -1,7 +1,7 @@
 from threading import Lock, Thread
 import ConsoleUI.Backend.ANSI as CL
 from time import sleep
-
+from signal import SIGWINCH, signal
 class RingBuffer:
     def __init__(self, size):
         self._contents = [None] * size
@@ -44,16 +44,22 @@ class ScreenManager:
     def __init__(self):
         self._original_settings = CL.enable_raw_input()
         self.width, self.height = CL.get_terminal_dimensions()
+        CL.write("Terminal size: %dx%d" % (self.width, self.height))
         self.screens = {}
         self._key_buffer = RingBuffer(1024)
+        self._termination_requested = False
+        self._update_dimensions = False
+        
         CL.save_screen()
         CL.clear_screen()
-
-        self._termination_requested = False
+        #signal(SIGWINCH, self._handle_terminal_size_change_signal)
 
     def __del__(self):
         CL.restore_screen()
         CL.disable_raw_input(self._original_settings)
+
+    def _handle_terminal_size_change_signal(self, sig, data):
+        self._update_dimensions = True
 
     def add_screen(self, screen_name, screen_obj: Screen):
         screen_obj.width = self.width
@@ -86,6 +92,12 @@ class ScreenManager:
             key = self._key_buffer.pop()
             if key is not None:
                 active_screen.handle_key(key)
+            
+            if self._update_dimensions:
+                self.width, self.height = CL.get_terminal_dimensions()
+                for _, screen_obj in self.screens.items():
+                    screen_obj.create_widgets()
+                self._update_dimensions = False
 
         keyboard_thread.join()
 

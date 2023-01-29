@@ -4,6 +4,7 @@ from LogAggregate import LogAggregate, LogAggregateThread
 from LogSource import LogSource
 from getopt import gnu_getopt
 from sys import argv
+from signal import SIGWINCH
 
 class Config:
     def __init__(self):
